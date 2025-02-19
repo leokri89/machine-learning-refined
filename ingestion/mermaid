@@ -1,0 +1,44 @@
+flowchart TD
+    load_var(Carrega variaveis de ambiente) --> check_tenant{ Payload possui tenant? }
+    check_tenant --> | Nao | status_400
+    check_tenant --> | Sim | check_chat_id{ Payload possui chat_id? }
+    check_chat_id --> | Nao | status_400
+    check_chat_id --> | Sim | set_embed_model(Define modelo embed)
+    set_embed_model --> load_pgvector_credentials(Carrega credencial pgvector)
+    load_pgvector_credentials --> distance_strategy(Define a estrategia de distancia)
+    status_400(Retorna status 400)
+    distance_strategy --> instance_bedrock_client(Instacia client do bedrock)
+    --> load_stop_words(Carrega stop words)
+    load_stop_words --> load_stemmer(Carrega Stemmer)
+    load_stemmer--> load_spacy(Carrega Spacy)
+    load_spacy--> load_bedrock_embbed(Carrega cliente Bedrock Embendding)
+    load_bedrock_embbed--> set_text_splitter(Define o text splitter)
+    set_text_splitter--> load_corpus(Carrega o conteudo do RAG)
+    load_corpus--> for_row(Carrega linha com pergunta e resposta)
+    for_row--> chunk_answer(Divide a resposta em chunks)
+    chunk_answer--> create_doc(Cria documento com chunk e pergunta)
+    create_doc--> add_doc_list(Adiciona documento a lista)
+    add_doc_list--> end_of_file{Todas perguntas foram processadas?}
+    end_of_file --> | Nao | for_row
+    end_of_file --> | Sim | create_pgvector_string
+    create_pgvector_string --> pgvector_exists{Colecao do pgvector existe?}
+    pgvector_exists--> | Nao | create_collection
+    create_collection --> insert_docs_to_collection
+    pgvector_exists --> | Sim | apaga_collection
+    apaga_collection--> create_collection
+    insert_docs_to_collection--> create_s3_client
+    create_s3_client --> load_corpus_2
+    load_corpus_2 --> for_row_preprocess
+    for_row_preprocess --> load_row_preprocess
+    load_row_preprocess --> tokenize_row_preprocess
+    tokenize_row_preprocess --> need_remove_stop_words{remove stop words?}
+    need_remove_stop_words --> |Sim| do_remove_stop_words
+    do_remove_stop_words --> need_stemmer
+    need_remove_stop_words --> |Nao| need_stemmer{need_stemmer}
+    need_stemmer --> |Sim| do_stemmer
+    do_stemmer --> end_of_corpus_preprocess
+    need_stemmer --> |Nao| end_of_corpus_preprocess{end_of_corpus_preprocess}
+    end_of_corpus_preprocess --> load_row_preprocess
+    end_of_corpus_preprocess --> | Sim | fit_bm25
+    fit_bm25 --> save_bm25_s3
+    save_bm25_s3 --> insert_record_dynamodb
